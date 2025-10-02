@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>聊天室</title>
+    <style>
+        body {
+            margin: 0;
+            padding-bottom: 3rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #auth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #f0f2f5;
+            z-index: 1000;
+        }
+
+        .auth-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 350px;
+            max-width: 90%;
+        }
+
+        .auth-form h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .auth-form input {
+            border: 1px solid #ccc;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            width: calc(100% - 1.5rem);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .auth-form button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .auth-form button:hover {
+            background: #0056b3;
+        }
+
+        .auth-form p {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .auth-form a {
+            color: #007bff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .auth-form a:hover {
+            text-decoration: underline;
+        }
+
+        #auth-error {
+            color: red;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        #register-error {
+            color: red;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        #chat-container {
+            display: none; /* 初始隐藏 */
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        #messages {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+
+        #messages > li {
+            padding: 0.5rem 1rem;
+        }
+
+        #messages > li:nth-child(odd) {
+            background: #efefef;
+        }
+
+        #form {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 0.25rem;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            height: 3rem;
+            box-sizing: border-box;
+            backdrop-filter: blur(10px);
+        }
+
+        #input {
+            border: none;
+            padding: 0 1rem;
+            flex-grow: 1;
+            border-radius: 2rem;
+            margin: 0.25rem;
+        }
+
+        #input:focus {
+            outline: none;
+        }
+
+        #form > button {
+            background: #333;
+            border: none;
+            padding: 0 1rem;
+            margin: 0.25rem;
+            border-radius: 3px;
+            outline: none;
+            color: #fff;
+        }
+
+        #admin-panel-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none; /* 初始隐藏 */
+            z-index: 100;
+        }
+
+        #admin-panel {
+            display: none; /* 初始隐藏 */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #admin-panel-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            width: 80%;
+            max-width: 800px;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #admin-panel-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .admin-section {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+        }
+
+        .admin-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .user-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .user-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-actions button {
+            margin-left: 0.5rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 3px;
+            cursor: pointer;
+            border: none;
+            color: white;
+        }
+
+        .user-actions .mute-button { background: #dc3545; }
+        .user-actions .unmute-button { background: #28a745; }
+        .user-actions .set-admin-button { background: #007bff; }
+        .user-actions .remove-admin-button { background: #ffc107; }
+
+        #add-invite-code-form input {
+            width: auto;
+            margin-right: 0.5rem;
+        }
+
+        #add-invite-code-form button {
+            width: auto;
+            padding: 0.5rem 1rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="auth-container">
+        <div id="login-form" class="auth-form">
+            <h2>登录聊天室</h2>
+            <input id="login-username" type="text" placeholder="用户名" autocomplete="off" />
+            <input id="login-password" type="password" placeholder="密码" autocomplete="off" />
+            <button id="login-button">登录</button>
+            <p>还没有账号？<a id="show-register">注册</a></p>
+            <p id="auth-error" style="color: red; display: none;"></p>
+        </div>
+
+        <div id="register-form" class="auth-form" style="display: none;">
+            <h2>注册新账号</h2>
+            <input id="register-username" type="text" placeholder="用户名" autocomplete="off" />
+            <input id="register-password" type="password" placeholder="密码" autocomplete="off" />
+            <input id="invitation-code-input" type="text" placeholder="邀请码" autocomplete="off" />
+            <button id="register-button">注册</button>
+            <p>已有账号？<a id="show-login">登录</a></p>
+            <p id="register-error" style="color: red; display: none;"></p>
+        </div>
+    </div>
+
+    <div id="chat-container">
+        <button id="admin-panel-button" style="display: none;">管理员面板</button>
+        <ul id="messages"></ul>
+        <form id="form" action="">
+            <input id="input" autocomplete="off" /><button>发送</button>
+        </form>
+    </div>
+
+    <div id="admin-panel">
+        <div id="admin-panel-content">
+            <span id="admin-panel-close">&times;</span>
+            <h2>管理员面板</h2>
+
+            <div class="admin-section">
+                <h3>用户管理</h3>
+                <ul id="admin-user-list"></ul>
+            </div>
+
+            <div class="admin-section">
+                <h3>邀请码管理</h3>
+                <form id="add-invite-code-form">
+                    <input type="text" id="new-invite-code" placeholder="新邀请码" />
+                    <input type="number" id="new-invite-max-uses" placeholder="最大使用次数" value="1" min="1" />
+                    <button type="submit">添加邀请码</button>
+                </form>
+                <p id="invite-code-message" style="color: green; display: none;"></p>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
