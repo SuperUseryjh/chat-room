@@ -25,7 +25,7 @@ app.use(express.json()); // 用于解析 JSON 请求体
 
 // 简单的管理员认证中间件
 const adminAuth = (req, res, next) => {
-  const username = req.headers['x-username']; // 从请求头获取���户名
+  const username = req.headers['x-username']; // 从请求头获取用户名
   const isAdmin = req.headers['x-isadmin'] === 'true'; // 从请求头获取管理员状态
 
   if (isAdmin) {
@@ -125,7 +125,7 @@ app.post('/admin/set-admin', adminAuth, (req, res) => {
 
   updateUserAdminStatus(username, isAdmin, (err, success) => {
     if (err || !success) {
-      console.error(`���置用户 ${username} 管理员状态失败:`, err ? err.message : '未知错误');
+      console.error(`重置用户 ${username} 管理员状态失败:`, err ? err.message : '未知错误');
       return res.status(500).json({ success: false, message: `设置用户 ${username} 管理员状态失败` });
     }
     io.emit('user admin status', { username, isAdmin }); // 通知所有客户端用户管理员状态变化
@@ -151,7 +151,7 @@ io.on('connection', (socket) => {
         users[socket.id] = { username: user.username, isAdmin: user.isAdmin };
         callback({ success: true, username: user.username, isAdmin: user.isAdmin });
         io.emit('user joined', user.username); // 通知所有客户端有新用户加入
-        console.log(`用户 ${user.username} 登录成功 (管���员: ${user.isAdmin})`);
+        console.log(`用户 ${user.username} 登录成功 (管理员: ${user.isAdmin})`);
 
         // 发送最近的聊天记录给新登录的用户
         getRecentMessages(50, (err, messages) => {
