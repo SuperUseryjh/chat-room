@@ -1,0 +1,5 @@
+node_modules/
+chat.db
+app.log
+.env
+public/uploads/

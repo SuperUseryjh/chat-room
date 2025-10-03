@@ -18,7 +18,8 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
     db.run(`CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL,
-      message TEXT NOT NULL,
+      message TEXT,
+      file_url TEXT, -- 新增字段，用于存储图片URL
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS invitation_codes (
@@ -69,18 +70,18 @@ const verifyUser = (username, password, callback) => {
 };
 
 // 保存消息
-const saveMessage = (username, message, callback) => {
-  db.run('INSERT INTO messages (username, message) VALUES (?, ?)', [username, message], function(err) {
+const saveMessage = (username, message, file_url, callback) => {
+  db.run('INSERT INTO messages (username, message, file_url) VALUES (?, ?, ?)', [username, message, file_url], function(err) {
     if (err) {
       return callback(err);
     }
-    callback(null, { id: this.lastID, username: username, message: message, timestamp: new Date().toISOString() });
+    callback(null, { id: this.lastID, username: username, message: message, file_url: file_url, timestamp: new Date().toISOString() });
   });
 };
 
 // 获取最近的消息
 const getRecentMessages = (limit = 50, callback) => {
-  db.all('SELECT username, message, timestamp FROM messages ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
+  db.all('SELECT username, message, file_url, timestamp FROM messages ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
     if (err) {
       return callback(err);
     }
