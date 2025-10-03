@@ -18,6 +18,7 @@
             --my-message-bg: #dcf8c6; /* 浅绿色，更像聊天应用 */
             --other-message-bg: #ffffff; /* 白色 */
             --message-border-radius: 18px;
+            --sidebar-width: 200px;
         }
 
         body {
@@ -27,7 +28,6 @@
             color: var(--text-color-dark);
             line-height: 1.6;
             display: flex;
-            flex-direction: column;
             min-height: 100vh;
         }
 
@@ -147,10 +147,65 @@
         #chat-container {
             display: none; /* 初始隐藏 */
             flex-direction: column;
+            flex-grow: 1;
             height: 100vh;
             padding-bottom: 4.5rem; /* 为输入框留出更多空间 */
             box-sizing: border-box;
             background-color: var(--background-light);
+            margin-left: var(--sidebar-width); /* 为侧边栏留出空间 */
+        }
+
+        /* 侧边栏 */
+        #sidebar {
+            width: var(--sidebar-width);
+            background-color: #343a40; /* 深色背景 */
+            color: var(--text-color-light);
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+            display: none; /* 初始隐藏 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        #sidebar h3 {
+            color: var(--text-color-light);
+            margin-top: 1rem;
+            margin-bottom: 2rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        #sidebar button {
+            width: 90%;
+            padding: 0.8rem 1rem;
+            margin-bottom: 1rem;
+            background-color: #495057; /* 按钮背景 */
+            border-radius: 8px;
+            box-shadow: none;
+        }
+
+        #sidebar button:hover {
+            background-color: #6c757d;
+            transform: translateY(-1px);
+        }
+
+        #sidebar button:active {
+            transform: translateY(0);
+        }
+
+        #sidebar #logout-button {
+            background-color: #dc3545;
+            margin-top: auto; /* 推到底部 */
+        }
+
+        #sidebar #logout-button:hover {
+            background-color: #c82333;
         }
 
         #messages {
@@ -165,7 +220,6 @@
 
         #messages li {
             padding: 0.4rem 0;
-            /* border-bottom: 1px solid var(--background-dark); */ /* 移除列表项之间的分隔线 */
             word-wrap: break-word;
         }
 
@@ -177,11 +231,11 @@
             display: flex;
             flex-direction: column;
             margin-bottom: 0.8rem;
-            align-items: flex-start; /* 默认左对齐 */
+            align-items: flex-start;
         }
 
         .message-item.my-message {
-            align-items: flex-end; /* 我的消息右对齐 */
+            align-items: flex-end;
         }
 
         .message-meta {
@@ -198,7 +252,7 @@
         .message-content {
             padding: 0.8rem 1.2rem;
             border-radius: var(--message-border-radius);
-            max-width: 75%; /* 增加最大宽度 */
+            max-width: 75%;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             line-height: 1.4;
             word-break: break-word;
@@ -238,7 +292,7 @@
             padding: 0.75rem 1rem;
             position: fixed;
             bottom: 0;
-            left: 0;
+            left: var(--sidebar-width); /* 调整位置 */
             right: 0;
             display: flex;
             align-items: center;
@@ -268,7 +322,7 @@
             border-radius: 25px;
             font-size: 1rem;
             margin-left: 0.5rem;
-            box-shadow: none; /* 移除按钮的额外阴影 */
+            box-shadow: none;
         }
 
         #image-upload-label {
@@ -296,212 +350,109 @@
             display: none;
         }
 
-        /* 管理员面板按钮 */
-        #admin-panel-button {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 0.7rem 1.3rem;
-            border-radius: 25px;
-            cursor: pointer;
-            display: none; /* 初始隐藏 */
-            z-index: 100;
-            box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
-        }
-
-        #admin-panel-button:hover {
-            background: #218838;
-            transform: translateY(-1px);
-        }
-
-        #admin-panel-button:active {
-            transform: translateY(0);
-            box-shadow: 0 1px 3px rgba(40, 167, 69, 0.3);
-        }
-
-        /* 管理员面板 */
-        #admin-panel {
-            display: none; /* 初始隐藏 */
-            position: fixed;
-            top: 0;
+        /* 模态框样式 */
+        .modal {
+            display: none; /* 默认隐藏 */
+            position: fixed; /* 固定定位 */
+            z-index: 1001; /* 位于最上层 */
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.75); /* 更深的背景 */
-            z-index: 1000;
+            overflow: auto; /* 允许滚动 */
+            background-color: rgba(0,0,0,0.4); /* 半透明黑色背景 */
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(8px); /* 更强的模糊效果 */
         }
 
-        #admin-panel-content {
-            background: var(--text-color-light);
-            padding: 2.5rem;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-            width: 90%;
-            max-width: 900px;
-            max-height: 90%;
-            overflow-y: auto;
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
             position: relative;
-            animation: slideIn 0.3s ease-out;
+            text-align: center;
         }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-
-        #admin-panel-close {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            font-size: 2.2rem;
-            cursor: pointer;
-            color: var(--system-message-color);
-            transition: color 0.2s ease;
-        }
-
-        #admin-panel-close:hover {
-            color: #dc3545; /* 关闭按钮悬停变红 */
-        }
-
-        .admin-section {
-            margin-bottom: 2.5rem;
-            border-bottom: 1px solid var(--background-dark);
-            padding-bottom: 2rem;
-        }
-
-        .admin-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-
-        .admin-section h3 {
+        .modal-content h2 {
             margin-top: 0;
+            margin-bottom: 1.5rem;
             color: var(--text-color-dark);
             font-weight: 700;
-            font-size: 1.5rem;
-            margin-bottom: 1.2rem;
         }
 
-        #admin-user-list {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
+        .modal-content input {
+            width: calc(100% - 20px); /* 减去 padding */
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
         }
 
-        .user-list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px dashed var(--background-dark);
+        .modal-content button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
         }
 
-        .user-list-item:last-child {
-            border-bottom: none;
+        .modal-content button:hover {
+            background-color: var(--primary-hover-color);
         }
 
-        .user-list-item span {
-            font-size: 1.05rem;
-            font-weight: 500;
-            color: var(--text-color-dark);
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            cursor: pointer;
         }
 
-        .user-actions button {
-            margin-left: 0.7rem;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #change-password-message {
+            margin-top: 1rem;
             font-size: 0.9rem;
-            box-shadow: none;
-        }
-
-        .user-actions .mute-button { background: #dc3545; }
-        .user-actions .mute-button:hover { background: #c82333; }
-        .user-actions .unmute-button { background: #28a745; }
-        .user-actions .unmute-button:hover { background: #218838; }
-        .user-actions .set-admin-button { background: var(--primary-color); }
-        .user-actions .set-admin-button:hover { background: var(--primary-hover-color); }
-        .user-actions .remove-admin-button { background: #ffc107; color: var(--text-color-dark); }
-        .user-actions .remove-admin-button:hover { background: #e0a800; }
-
-        #add-invite-code-form {
-            display: flex;
-            gap: 0.8rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        #add-invite-code-form input {
-            flex-grow: 1;
-            margin-bottom: 0; /* 覆盖默认的 input margin-bottom */
-            padding: 0.8rem 1.2rem;
-            border-radius: 8px;
-        }
-
-        #add-invite-code-form button {
-            flex-shrink: 0;
-            width: auto;
-            padding: 0.8rem 1.8rem;
-            border-radius: 8px;
+            font-weight: 500;
         }
 
         /* 响应式设计 */
         @media (max-width: 768px) {
-            .auth-form {
-                padding: 1.8rem;
-            }
-
-            .auth-form h2 {
-                font-size: 1.5rem;
-            }
-
-            #admin-panel-content {
-                padding: 1.8rem;
-            }
-
-            .admin-section h3 {
-                font-size: 1.3rem;
-            }
-
-            .user-list-item {
+            body {
                 flex-direction: column;
-                align-items: flex-start;
-                padding: 0.8rem 0;
             }
 
-            .user-actions {
-                margin-top: 0.6rem;
+            #sidebar {
+                position: relative;
                 width: 100%;
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: flex-start;
+                height: auto;
+                padding: 1rem 0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             }
 
-            .user-actions button {
+            #chat-container {
                 margin-left: 0;
-                margin-right: 0.6rem;
-                margin-bottom: 0.6rem;
-                padding: 0.4rem 0.8rem;
-            }
-
-            #add-invite-code-form {
-                flex-direction: column;
-                gap: 0.6rem;
-            }
-
-            #add-invite-code-form input,
-            #add-invite-code-form button {
-                width: 100%;
-                margin-right: 0;
+                padding-bottom: 4.5rem;
             }
 
             #form {
+                left: 0;
                 padding: 0.6rem 0.8rem;
             }
 
@@ -520,10 +471,16 @@
                 margin-left: 0.4rem;
             }
 
-            #admin-panel-button {
-                padding: 0.5rem 1rem;
-                border-radius: 15px;
-                font-size: 0.9rem;
+            .auth-form {
+                padding: 1.8rem;
+            }
+
+            .auth-form h2 {
+                font-size: 1.5rem;
+            }
+
+            .modal-content {
+                width: 90%;
             }
         }
 
@@ -551,14 +508,33 @@
         </div>
     </div>
 
-    <div id="chat-container">
+    <div id="sidebar">
+        <h3>聊天室</h3>
         <button id="admin-panel-button" style="display: none;" onclick="window.location.href='/admin'">管理员面板</button>
+        <button id="change-password-button">修改密码</button>
+        <button id="show-leaderboard-button" onclick="window.location.href='/leaderboard'">排行榜</button>
+        <button id="logout-button">退出登录</button>
+    </div>
+
+    <div id="chat-container">
         <ul id="messages"></ul>
         <form id="form" action="">
             <label for="image-input" id="image-upload-label">图片</label>
             <input type="file" id="image-input" accept="image/*" />
             <input id="input" autocomplete="off" /><button>发送</button>
         </form>
+    </div>
+
+    <div id="change-password-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>修改密码</h2>
+            <input type="password" id="old-password-input" placeholder="旧密码" />
+            <input type="password" id="new-password-input" placeholder="新密码" />
+            <input type="password" id="confirm-new-password-input" placeholder="确认新密码" />
+            <button id="submit-change-password">提交</button>
+            <p id="change-password-message" style="color: red; display: none;"></p>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

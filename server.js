@@ -4,8 +4,9 @@ const socketIo = require('socket.io');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const jwt = require('jsonwebtoken'); // 导入 jsonwebtoken
-const { registerUser, verifyUser, saveMessage, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted } = require('./database');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const { registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard } = require('./database');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,7 +15,8 @@ const io = socketIo(server);
 const users = {}; // 存储在线用户 { socket.id: { username, isAdmin } }
 const initialAdminUsername = process.env.INITIAL_ADMIN_USERNAME || 'admin';
 const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'adminpass';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key'; // JWT 密钥，生产环境应使用强随机密钥
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const saltRounds = 10;
 
 // 创建 uploads 目录（如果不存在）
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
@@ -48,6 +50,11 @@ app.use(express.json()); // 用于解析 JSON 请求体
 // 提供管理员面板页面
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// 提供排行榜页面
+app.get('/leaderboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'leaderboard.html'));
 });
 
 // JWT 认证中间件
@@ -118,6 +125,54 @@ app.post('/upload', upload.single('image'), (req, res) => {
   // 返回可访问的图片 URL
   const fileUrl = `/uploads/${req.file.filename}`;
   res.json({ success: true, fileUrl: fileUrl });
+});
+
+// 修改密码路由
+app.post('/change-password', authenticateJWT, (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const username = req.user.username; // 从 JWT 中获取用户名
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: '旧密码和新密码不能为空' });
+  }
+
+  verifyUser(username, oldPassword, (err, user) => {
+    if (err) {
+      console.error('验证旧密码失败:', err.message);
+      return res.status(500).json({ success: false, message: '修改密码失败' });
+    }
+    if (!user) {
+      return res.status(401).json({ success: false, message: '旧密码不正确' });
+    }
+
+    // 验证旧密码成功，哈希新密码并更新
+    bcrypt.hash(newPassword, saltRounds, (err, newHashedPassword) => {
+      if (err) {
+        console.error('哈希新密码失败:', err.message);
+        return res.status(500).json({ success: false, message: '修改密码失败' });
+      }
+
+      updateUserPassword(username, newHashedPassword, (err, success) => {
+        if (err || !success) {
+          console.error('更新用户密码失败:', err ? err.message : '未知错误');
+          return res.status(500).json({ success: false, message: '修改密码失败' });
+        }
+        res.json({ success: true, message: '密码修改成功，请重新登录' });
+      });
+    });
+  });
+});
+
+// 获取排行榜数据路由
+app.get('/scores/:timeframe', authenticateJWT, (req, res) => {
+  const { timeframe } = req.params;
+  getLeaderboard(timeframe, (err, scores) => {
+    if (err) {
+      console.error('获取排行榜失败:', err.message);
+      return res.status(500).json({ success: false, message: '获取排行榜失败' });
+    }
+    res.json({ success: true, scores: scores });
+  });
 });
 
 // 管理员面板 API (现在使用 JWT 认证和管理员授权)
@@ -197,7 +252,7 @@ io.on('connection', (socket) => {
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
       if (err) {
-        return callback({ success: false, message: '无��或过期的 token' });
+        return callback({ success: false, message: '无效或过期的 token' });
       }
 
       if (Object.values(users).some(u => u.username === user.username)) {
@@ -283,6 +338,14 @@ io.on('connection', (socket) => {
           return callback && callback({ success: false, message: '你已被禁言，无法发送消息。', isMuted: true });
         }
 
+        // 记录用户发言
+        recordUserSpeech(username, (err) => {
+          if (err) {
+            console.error('记录用户发言失败:', err.message);
+            // 即使记录失败，也允许消息发送
+          }
+        });
+
         saveMessage(username, text, fileUrl, (err, savedMsg) => {
           if (err) {
             console.error('保存消息失败:', err.message);
@@ -298,7 +361,7 @@ io.on('connection', (socket) => {
 
   // 处理用户断开连接
   socket.on('disconnect', () => {
-    // 找到并移除断开连接��用户
+    // 找到并移除断开连接的用户
     let disconnectedUsername = null;
     for (const socketId in users) {
       if (socketId === socket.id) {

@@ -17,12 +17,24 @@ const registerButton = document.getElementById('register-button');
 const showLoginLink = document.getElementById('show-login');
 const registerError = document.getElementById('register-error');
 
+const sidebar = document.getElementById('sidebar');
 const chatContainer = document.getElementById('chat-container');
 const form = document.getElementById('form');
 const input = document.getElementById('input');
 const messages = document.getElementById('messages');
 const adminPanelButton = document.getElementById('admin-panel-button');
 const imageInput = document.getElementById('image-input');
+
+const changePasswordButton = document.getElementById('change-password-button');
+const changePasswordModal = document.getElementById('change-password-modal');
+const closePasswordModalButton = changePasswordModal.querySelector('.close-button');
+const oldPasswordInput = document.getElementById('old-password-input');
+const newPasswordInput = document.getElementById('new-password-input');
+const confirmNewPasswordInput = document.getElementById('confirm-new-password-input');
+const submitChangePasswordButton = document.getElementById('submit-change-password');
+const changePasswordMessage = document.getElementById('change-password-message');
+
+const logoutButton = document.getElementById('logout-button');
 
 let currentUsername = '';
 let isAdmin = false;
@@ -67,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('reconnect_login', authToken, (response) => {
             if (response.success) {
                 authContainer.style.display = 'none';
+                sidebar.style.display = 'flex'; // 显示侧边栏
                 chatContainer.style.display = 'flex';
                 if (isAdmin) {
                     adminPanelButton.style.display = 'block';
@@ -77,12 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.removeItem('chat_username');
                 localStorage.removeItem('chat_isAdmin');
                 authContainer.style.display = 'flex';
+                sidebar.style.display = 'none';
                 chatContainer.style.display = 'none';
                 alert('登录会话已过期或无效，请重新登录。');
             }
         });
     } else {
         authContainer.style.display = 'flex';
+        sidebar.style.display = 'none';
         chatContainer.style.display = 'none';
     }
 });
@@ -165,6 +180,7 @@ loginButton.addEventListener('click', () => {
             localStorage.setItem('chat_token', authToken);
 
             authContainer.style.display = 'none';
+            sidebar.style.display = 'flex'; // 显示侧边栏
             chatContainer.style.display = 'flex'; // 显示聊天界面
 
             if (isAdmin) {
@@ -263,4 +279,90 @@ socket.on('user left', (username) => {
 // 接收聊天错误信息 (例如被禁言)
 socket.on('chat error', (errorMessage) => {
     alert(errorMessage);
+});
+
+// 修改密码功能
+changePasswordButton.addEventListener('click', () => {
+    changePasswordModal.style.display = 'flex';
+    changePasswordMessage.style.display = 'none';
+    oldPasswordInput.value = '';
+    newPasswordInput.value = '';
+    confirmNewPasswordInput.value = '';
+});
+
+closePasswordModalButton.addEventListener('click', () => {
+    changePasswordModal.style.display = 'none';
+});
+
+window.addEventListener('click', (event) => {
+    if (event.target === changePasswordModal) {
+        changePasswordModal.style.display = 'none';
+    }
+});
+
+submitChangePasswordButton.addEventListener('click', async () => {
+    const oldPassword = oldPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmNewPassword = confirmNewPasswordInput.value;
+
+    if (!oldPassword || !newPassword || !confirmNewPassword) {
+        changePasswordMessage.textContent = '所有密码字段都不能为空';
+        changePasswordMessage.style.display = 'block';
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+        changePasswordMessage.textContent = '新密码和确认密码不匹配';
+        changePasswordMessage.style.display = 'block';
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        changePasswordMessage.textContent = '新密码长度不能少于6位';
+        changePasswordMessage.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch('/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ oldPassword, newPassword }),
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert(data.message);
+            // 密码修改成功后，强制用户重新登录以获取新的 JWT
+            localStorage.removeItem('chat_token');
+            localStorage.removeItem('chat_username');
+            localStorage.removeItem('chat_isAdmin');
+            window.location.reload();
+        } else {
+            changePasswordMessage.textContent = data.message;
+            changePasswordMessage.style.display = 'block';
+            if (data.message.includes('token') || data.message.includes('授权')) {
+                // JWT 无效或过期，强制重新登录
+                localStorage.removeItem('chat_token');
+                localStorage.removeItem('chat_username');
+                localStorage.removeItem('chat_isAdmin');
+                window.location.reload();
+            }
+        }
+    } catch (error) {
+        console.error('修改密码请求失败:', error);
+        changePasswordMessage.textContent = '修改密码失败，请稍后再试';
+        changePasswordMessage.style.display = 'block';
+    }
+});
+
+// 退出登录功能
+logoutButton.addEventListener('click', () => {
+    localStorage.removeItem('chat_token');
+    localStorage.removeItem('chat_username');
+    localStorage.removeItem('chat_isAdmin');
+    window.location.reload(); // 刷新页面回到登录界面
 });

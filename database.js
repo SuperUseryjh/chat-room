@@ -19,7 +19,7 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL,
       message TEXT,
-      file_url TEXT, -- 新增字段，用于存储图片URL
+      file_url TEXT,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS invitation_codes (
@@ -32,6 +32,11 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       is_muted INTEGER DEFAULT 1 -- 0 for false, 1 for true
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS user_scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
   }
 });
@@ -64,8 +69,18 @@ const verifyUser = (username, password, callback) => {
       if (err) {
         return callback(err);
       }
-      callback(null, result ? { username: user.username, isAdmin: user.isAdmin === 1 } : false); // result 为 true 或 false
+      callback(null, result ? { username: user.username, isAdmin: user.isAdmin === 1, hashedPassword: user.password } : false); // result 为 true 或 false
     });
+  });
+};
+
+// 更新用户密码
+const updateUserPassword = (username, newHashedPassword, callback) => {
+  db.run('UPDATE users SET password = ? WHERE username = ?', [newHashedPassword, username], function(err) {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, this.changes > 0);
   });
 };
 
@@ -76,6 +91,16 @@ const saveMessage = (username, message, file_url, callback) => {
       return callback(err);
     }
     callback(null, { id: this.lastID, username: username, message: message, file_url: file_url, timestamp: new Date().toISOString() });
+  });
+};
+
+// 记录用户发言
+const recordUserSpeech = (username, callback) => {
+  db.run('INSERT INTO user_scores (username) VALUES (?)', [username], function(err) {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, { id: this.lastID, username: username, timestamp: new Date().toISOString() });
   });
 };
 
@@ -169,4 +194,38 @@ const isUserMuted = (username, callback) => {
   });
 };
 
-module.exports = { db, registerUser, verifyUser, saveMessage, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted };
+// 获取排行榜数据
+const getLeaderboard = (timeframe, callback) => {
+  let query = '';
+  let params = [];
+  const now = new Date();
+
+  switch (timeframe) {
+    case 'daily':
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      query = 'SELECT username, COUNT(*) AS score FROM user_scores WHERE timestamp >= ? GROUP BY username ORDER BY score DESC LIMIT 10';
+      params = [startOfDay];
+      break;
+    case 'weekly':
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
+      query = 'SELECT username, COUNT(*) AS score FROM user_scores WHERE timestamp >= ? GROUP BY username ORDER BY score DESC LIMIT 10';
+      params = [startOfWeek];
+      break;
+    case 'monthly':
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      query = 'SELECT username, COUNT(*) AS score FROM user_scores WHERE timestamp >= ? GROUP BY username ORDER BY score DESC LIMIT 10';
+      params = [startOfMonth];
+      break;
+    default:
+      return callback(new Error('无效的时间范围'));
+  }
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows);
+  });
+};
+
+module.exports = { db, registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard };
