@@ -247,16 +247,6 @@ const getAllInvitationCodes = (callback) => {
   });
 };
 
-// 获取所有邀请码
-const getAllInvitationCodes = (callback) => {
-  db.all('SELECT code, max_uses, current_uses FROM invitation_codes', (err, rows) => {
-    if (err) {
-      return callback(err);
-    }
-    callback(null, rows);
-  });
-};
-
 // 获取所有旧图片的文件路径
 const getOldImageFilePaths = (callback) => {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
