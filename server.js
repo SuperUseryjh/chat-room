@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes } = require('./database');
+const { registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes, getOldImageFilePaths, deleteOldImageMessages } = require('./database');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +35,38 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage: storage });
+
+// 图片清理函数
+const cleanupImages = () => {
+  getOldImageFilePaths((err, fileUrls) => {
+    if (err) {
+      return console.error('获取旧图片文件路径失败:', err.message);
+    }
+
+    fileUrls.forEach(fileUrl => {
+      const filePath = path.join(__dirname, 'public', fileUrl);
+      fs.unlink(filePath, (unlinkErr) => {
+        if (unlinkErr) {
+          console.error(`删除旧图片文件 ${filePath} 失败:`, unlinkErr.message);
+        } else {
+          console.log(`已删除旧图片文件: ${filePath}`);
+        }
+      });
+    });
+
+    deleteOldImageMessages((err, changes) => {
+      if (err) {
+        return console.error('删除旧图片消息记录失败:', err.message);
+      }
+      console.log(`已从数据库中删除 ${changes} 条旧图片消息记录。`);
+    });
+  });
+};
+
+// 首次启动时执行清理
+cleanupImages();
+// 每天执行一次清理 (24小时 * 60分钟 * 60秒 * 1000毫秒)
+setInterval(cleanupImages, 24 * 60 * 60 * 1000);
 
 // 初始化管理员账户
 registerUser(initialAdminUsername, initialAdminPassword, true, (err, user) => {

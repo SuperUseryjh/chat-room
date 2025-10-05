@@ -247,4 +247,36 @@ const getAllInvitationCodes = (callback) => {
   });
 };
 
-module.exports = { db, registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes };
+// 获取所有邀请码
+const getAllInvitationCodes = (callback) => {
+  db.all('SELECT code, max_uses, current_uses FROM invitation_codes', (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows);
+  });
+};
+
+// 获取所有旧图片的文件路径
+const getOldImageFilePaths = (callback) => {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  db.all('SELECT file_url FROM messages WHERE file_url IS NOT NULL AND timestamp < ?', [sevenDaysAgo], (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows.map(row => row.file_url));
+  });
+};
+
+// 删除旧图片的消息记录
+const deleteOldImageMessages = (callback) => {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  db.run('DELETE FROM messages WHERE file_url IS NOT NULL AND timestamp < ?', [sevenDaysAgo], function(err) {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, this.changes);
+  });
+};
+
+module.exports = { db, registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes, getOldImageFilePaths, deleteOldImageMessages };
