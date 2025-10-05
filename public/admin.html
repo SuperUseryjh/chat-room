@@ -20,6 +20,47 @@
             --message-border-radius: 18px;
         }
 
+        body[data-theme='dark'] {
+            --primary-color: #66bb6a;
+            --primary-hover-color: #388e3c;
+            --background-light: #303030;
+            --background-dark: #424242;
+            --text-color-dark: #e0e0e0;
+            --text-color-light: #212121;
+            --border-color: #616161;
+            --shadow-light: rgba(255, 255, 255, 0.1);
+            --system-message-color: #bdbdbd;
+            --my-message-bg: #4caf50;
+            --other-message-bg: #555555;
+        }
+
+        body[data-theme='light'] {
+            --primary-color: #007bff;
+            --primary-hover-color: #0056b3;
+            --background-light: #f0f2f5;
+            --background-dark: #e9ecef;
+            --text-color-dark: #333;
+            --text-color-light: #fff;
+            --border-color: #ced4da;
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            --system-message-color: #6c757d;
+            --my-message-bg: #dcf8c6;
+            --other-message-bg: #ffffff;
+        }
+
+        .theme-switch-container {
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .theme-switch-container button {
+            background-color: #6c757d;
+        }
+
+        .theme-switch-container button:hover {
+            background-color: #5a6268;
+        }
+
         body {
             margin: 0;
             font-family: 'Roboto', sans-serif;
@@ -181,6 +222,83 @@
             font-weight: 500;
         }
 
+        #invite-codes-list {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--background-dark);
+            padding-top: 1rem;
+        }
+
+        .invite-code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px dashed var(--background-dark);
+            font-size: 0.95rem;
+        }
+
+        .invite-code-item:last-child {
+            border-bottom: none;
+        }
+
+        .invite-code-item .code-text {
+            font-weight: 500;
+            color: var(--text-color-dark);
+        }
+
+        .invite-code-item .uses-info {
+            color: var(--system-message-color);
+        }
+
+        #plugin-list {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 1.5rem;
+        }
+
+        .plugin-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px dashed var(--background-dark);
+        }
+
+        .plugin-item:last-child {
+            border-bottom: none;
+        }
+
+        .plugin-info {
+            flex-grow: 1;
+            text-align: left;
+        }
+
+        .plugin-info h4 {
+            margin: 0;
+            font-size: 1.05rem;
+            color: var(--text-color-dark);
+        }
+
+        .plugin-info p {
+            margin: 0.2rem 0 0;
+            font-size: 0.85rem;
+            color: var(--system-message-color);
+        }
+
+        .plugin-toggle-button {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            box-shadow: none;
+        }
+
+        .plugin-toggle-button.enabled { background: #28a745; }
+        .plugin-toggle-button.enabled:hover { background: #218838; }
+        .plugin-toggle-button.disabled { background: #dc3545; }
+        .plugin-toggle-button.disabled:hover { background: #c82333; }
+
         /* 响应式设计 */
         @media (max-width: 768px) {
             body {
@@ -229,6 +347,10 @@
     <div id="admin-panel-container">
         <h2>管理员面板</h2>
 
+        <div class="theme-switch-container">
+            <button id="theme-toggle-button">切换主题</button>
+        </div>
+
         <div class="admin-section">
             <h3>用户管理</h3>
             <ul id="admin-user-list"></ul>
@@ -242,6 +364,13 @@
                 <button type="submit">添加邀请码</button>
             </form>
             <p id="invite-code-message" style="color: green; display: none;"></p>
+            <h4>现有邀请码</h4>
+            <ul id="invite-codes-list"></ul>
+        </div>
+
+        <div class="admin-section">
+            <h3>插件管理</h3>
+            <ul id="plugin-list"></ul>
         </div>
 
         <button onclick="window.location.href='/'">返回聊天室</button>

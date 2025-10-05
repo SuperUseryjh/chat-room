@@ -57,6 +57,10 @@ fi
 
 echo "Node.js 和 npm 已安装。"
 
+# 交互式获取端口号
+read -p "请输入服务器端口号 (默认为 3000): " PORT_INPUT
+PORT_TO_USE=${PORT_INPUT:-3000}
+
 # 进入项目目录
 PROJECT_DIR="$(dirname "$0")"
 cd "$PROJECT_DIR"
@@ -93,6 +97,7 @@ echo ""
 export INITIAL_ADMIN_USERNAME
 export INITIAL_ADMIN_PASSWORD
 export JWT_SECRET
+export PORT=$PORT_TO_USE
 
 echo "环境变量已设置。"
 
@@ -102,9 +107,9 @@ nohup npm start > app.log 2>&1 &
 
 # 获取后台进程的 PID
 PID=$!
-echo "聊天室服务器已在后台启动，PID: $PID"
+echo "聊���室服务器已在后台启动，PID: $PID"
 echo "日志文件: app.log"
-echo "你可以通过访问 http://localhost:3000 来访问聊天室。"
+echo "你可以通过访问 http://localhost:${PORT_TO_USE} 来访问聊天室。"
 echo "要停止服务器，请运行 kill $PID"
 
 exit 0

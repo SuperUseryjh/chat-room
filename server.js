@@ -6,13 +6,14 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard } = require('./database');
+const { registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes } = require('./database');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 const users = {}; // 存储在线用户 { socket.id: { username, isAdmin } }
+const onlineUsernames = new Set(); // 存储在线用户的用户名
 const initialAdminUsername = process.env.INITIAL_ADMIN_USERNAME || 'admin';
 const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'adminpass';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
@@ -241,6 +242,146 @@ app.post('/admin/set-admin', authenticateJWT, authorizeAdmin, (req, res) => {
   });
 });
 
+// 获取所有邀请码的路由
+app.get('/admin/invitation-codes-list', authenticateJWT, authorizeAdmin, (req, res) => {
+  getAllInvitationCodes((err, codes) => {
+    if (err) {
+      console.error('获取邀请码列表失败:', err.message);
+      return res.status(500).json({ success: false, message: '获取邀请码列表失败' });
+    }
+    res.json({ success: true, codes: codes });
+  });
+});
+
+// 获取所有插件的路由
+app.get('/admin/plugins', authenticateJWT, authorizeAdmin, (req, res) => {
+  const pluginsInfo = loadedPlugins.map(plugin => ({
+    name: plugin.name,
+    description: plugin.description,
+    version: plugin.version,
+    enabled: plugin.enabled !== false, // 默认启用
+  }));
+  res.json({ success: true, plugins: pluginsInfo });
+});
+
+// 切换插件状态的路由
+app.post('/admin/plugins/toggle', authenticateJWT, authorizeAdmin, (req, res) => {
+  const { name, enabled } = req.body;
+  const pluginIndex = loadedPlugins.findIndex(p => p.name === name);
+
+  if (pluginIndex === -1) {
+    return res.status(404).json({ success: false, message: '插件未找到' });
+  }
+
+  const plugin = loadedPlugins[pluginIndex];
+  plugin.enabled = enabled;
+
+  // 重新加载插件以应用状态变化
+  // 注意：这里只是简单地重新加载，实际生产环境可能需要更复杂的插件热插拔机制
+  loadedPlugins = []; // 清空当前加载的插件
+  loadPlugins(); // 重新加载所有插件
+
+  res.json({ success: true, message: `插件 ${name} 已${enabled ? '启用' : '禁用'}` });
+});
+
+// 插件系统
+const pluginsDir = path.join(__dirname, 'plugins');
+let loadedPlugins = [];
+
+const pluginApi = {
+  sendMessage: (message, username = 'System', fileUrl = null, quotedMessage = null, mentions = []) => {
+    // 模拟 io.emit('chat message')
+    io.emit('chat message', { username, message, file_url: fileUrl, timestamp: new Date().toISOString(), quoted_message: quotedMessage, mentions: mentions });
+  },
+  getOnlineUsers: () => Array.from(onlineUsernames),
+  getAdminUsers: async () => {
+    return new Promise((resolve, reject) => {
+      getAllUsers((err, users) => {
+        if (err) return reject(err);
+        resolve(users.filter(u => u.isAdmin).map(u => u.username));
+      });
+    });
+  },
+  muteUser: (username) => {
+    return new Promise((resolve, reject) => {
+      muteUser(username, (err, success) => {
+        if (err) return reject(err);
+        if (success) io.emit('user muted status', { username, isMuted: true });
+        resolve(success);
+      });
+    });
+  },
+  unmuteUser: (username) => {
+    return new Promise((resolve, reject) => {
+      unmuteUser(username, (err, success) => {
+        if (err) return reject(err);
+        if (success) io.emit('user muted status', { username, isMuted: false });
+        resolve(success);
+      });
+    });
+  },
+  isUserMuted: (username) => {
+    return new Promise((resolve, reject) => {
+      isUserMuted(username, (err, isMuted) => {
+        if (err) return reject(err);
+        resolve(isMuted);
+      });
+    });
+  },
+  // 简单的事件系统，用于插件内部通信
+  _events: {},
+  on: function(eventName, listener) {
+    if (!this._events[eventName]) {
+      this._events[eventName] = [];
+    }
+    this._events[eventName].push(listener);
+  },
+  off: function(eventName, listener) {
+    if (!this._events[eventName]) return;
+    this._events[eventName] = this._events[eventName].filter(l => l !== listener);
+  },
+  emit: function(eventName, ...args) {
+    if (this._events[eventName]) {
+      this._events[eventName].forEach(listener => listener(...args));
+    }
+  }
+};
+
+function loadPlugins() {
+  if (!fs.existsSync(pluginsDir)) {
+    console.warn('插件目录不存在: ', pluginsDir);
+    return;
+  }
+
+  fs.readdirSync(pluginsDir).forEach(file => {
+    if (file.endsWith('.js')) {
+      const pluginPath = path.join(pluginsDir, file);
+      try {
+        // 清除 require 缓存，以便在开发过程中重新加载插件
+        delete require.cache[require.resolve(pluginPath)];
+        const plugin = require(pluginPath);
+        if (plugin.name) {
+          // 检查插件是否已启用 (默认为 true)
+          if (plugin.enabled === undefined || plugin.enabled === true) {
+            plugin.onLoad && plugin.onLoad(pluginApi);
+            loadedPlugins.push(plugin);
+            console.log(`插件加载成功: ${plugin.name} (版本: ${plugin.version || 'N/A'})`);
+          } else {
+            console.log(`插件 ${plugin.name} 已禁用，未加载。`);
+          }
+        } else {
+          console.warn(`插件文件 ${file} 缺少 'name' 属性，跳过加载。`);
+        }
+      } catch (error) {
+        console.error(`加载插件 ${file} 失败:`, error.message);
+      }
+    }
+  });
+}
+
+// 在服务器启动时加载插件
+loadPlugins();
+
 io.on('connection', (socket) => {
   console.log('新用户连接:', socket.id);
 
@@ -260,6 +401,7 @@ io.on('connection', (socket) => {
       }
 
       users[socket.id] = { username: user.username, isAdmin: user.isAdmin };
+      onlineUsernames.add(user.username); // 添加到在线用户列表
       callback({ success: true, username: user.username, isAdmin: user.isAdmin });
       console.log(`用户 ${user.username} 重新登录成功 (管理员: ${user.isAdmin})`);
 
@@ -271,6 +413,7 @@ io.on('connection', (socket) => {
         }
         socket.emit('history messages', messages);
       });
+      io.emit('online users', Array.from(onlineUsernames)); // 广播更新后的在线用户列表
     });
   });
 
@@ -291,8 +434,10 @@ io.on('connection', (socket) => {
         const token = jwt.sign({ username: user.username, isAdmin: user.isAdmin }, JWT_SECRET, { expiresIn: '1h' });
 
         users[socket.id] = { username: user.username, isAdmin: user.isAdmin };
+        onlineUsernames.add(user.username); // 添加到在线用户列表
         callback({ success: true, username: user.username, isAdmin: user.isAdmin, token: token });
         io.emit('user joined', user.username); // 通知所有客户端有新用户加入
+        io.emit('online users', Array.from(onlineUsernames)); // 广播更新后的在线用户列表
         console.log(`用户 ${user.username} 登录成功 (管理员: ${user.isAdmin})`);
 
         // 发送最近的聊天记录给新登录的用户
@@ -312,7 +457,7 @@ io.on('connection', (socket) => {
 
   // 处理聊天消息 (验证 JWT)
   socket.on('chat message', (messageData, callback) => {
-    const { token, text, fileUrl } = messageData;
+    const { token, text, fileUrl, quotedMessage, mentions } = messageData;
 
     if (!token) {
       return callback && callback({ success: false, message: '未提供认证 token' });
@@ -338,6 +483,26 @@ io.on('connection', (socket) => {
           return callback && callback({ success: false, message: '你已被禁言，无法发送消息。', isMuted: true });
         }
 
+        // 插件消息预处理
+        let messageHandledByPlugin = false;
+        for (const plugin of loadedPlugins) {
+          if (plugin.onChatMessage) {
+            try {
+              const result = plugin.onChatMessage(messageData, pluginApi);
+              if (result === true) {
+                messageHandledByPlugin = true;
+                break;
+              }
+            } catch (pluginError) {
+              console.error(`插件 ${plugin.name} 处理消息失败:`, pluginError.message);
+            }
+          }
+        }
+
+        if (messageHandledByPlugin) {
+          return callback && callback({ success: true }); // 插件已处理消息，不再进行默认处理
+        }
+
         // 记录用户发言
         recordUserSpeech(username, (err) => {
           if (err) {
@@ -346,12 +511,12 @@ io.on('connection', (socket) => {
           }
         });
 
-        saveMessage(username, text, fileUrl, (err, savedMsg) => {
+        saveMessage(username, text, fileUrl, quotedMessage, mentions, (err, savedMsg) => {
           if (err) {
             console.error('保存消息失败:', err.message);
             return callback && callback({ success: false, message: '发送消息失败' });
           }
-          io.emit('chat message', { username: username, message: text, file_url: fileUrl, timestamp: savedMsg.timestamp }); // 广播消息给所有客户端
+          io.emit('chat message', { username: username, message: text, file_url: fileUrl, timestamp: savedMsg.timestamp, quoted_message: quotedMessage, mentions: mentions }); // 广播消息给所有客户端
           console.log(`[${username}]: ${text || '[图片]'}`);
           callback && callback({ success: true });
         });
@@ -372,7 +537,9 @@ io.on('connection', (socket) => {
     }
 
     if (disconnectedUsername) {
+      onlineUsernames.delete(disconnectedUsername); // 从在线用户列表中移除
       io.emit('user left', disconnectedUsername); // 通知所有客户端有用户离开
+      io.emit('online users', Array.from(onlineUsernames)); // 广播更新后的在线用户列表
       console.log(`用户 ${disconnectedUsername} 断开连接`);
     }
     console.log('用户断开连接:', socket.id);

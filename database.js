@@ -20,6 +20,8 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
       username TEXT NOT NULL,
       message TEXT,
       file_url TEXT,
+      quoted_message TEXT, -- 新增字段，用于存储引用消息的 JSON 字符串
+      mentions TEXT, -- 新增字段，用于存储提及用户的 JSON 字符串
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS invitation_codes (
@@ -85,12 +87,14 @@ const updateUserPassword = (username, newHashedPassword, callback) => {
 };
 
 // 保存消息
-const saveMessage = (username, message, file_url, callback) => {
-  db.run('INSERT INTO messages (username, message, file_url) VALUES (?, ?, ?)', [username, message, file_url], function(err) {
+const saveMessage = (username, message, file_url, quotedMessage, mentions, callback) => {
+  const quotedMessageJson = quotedMessage ? JSON.stringify(quotedMessage) : null;
+  const mentionsJson = mentions && mentions.length > 0 ? JSON.stringify(mentions) : null;
+  db.run('INSERT INTO messages (username, message, file_url, quoted_message, mentions) VALUES (?, ?, ?, ?, ?)', [username, message, file_url, quotedMessageJson, mentionsJson], function(err) {
     if (err) {
       return callback(err);
     }
-    callback(null, { id: this.lastID, username: username, message: message, file_url: file_url, timestamp: new Date().toISOString() });
+    callback(null, { id: this.lastID, username: username, message: message, file_url: file_url, quoted_message: quotedMessage, mentions: mentions, timestamp: new Date().toISOString() });
   });
 };
 
@@ -106,11 +110,16 @@ const recordUserSpeech = (username, callback) => {
 
 // 获取最近的消息
 const getRecentMessages = (limit = 50, callback) => {
-  db.all('SELECT username, message, file_url, timestamp FROM messages ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
+  db.all('SELECT username, message, file_url, quoted_message, mentions, timestamp FROM messages ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
     if (err) {
       return callback(err);
     }
-    callback(null, rows.reverse()); // 返回按时间正序排列的消息
+    const messagesWithParsedData = rows.map(row => ({
+      ...row,
+      quoted_message: row.quoted_message ? JSON.parse(row.quoted_message) : null,
+      mentions: row.mentions ? JSON.parse(row.mentions) : [],
+    }));
+    callback(null, messagesWithParsedData.reverse()); // 返回按时间正序排列的消息
   });
 };
 
@@ -228,4 +237,14 @@ const getLeaderboard = (timeframe, callback) => {
   });
 };
 
-module.exports = { db, registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard };
+// 获取所有邀请码
+const getAllInvitationCodes = (callback) => {
+  db.all('SELECT code, max_uses, current_uses FROM invitation_codes', (err, rows) => {
+    if (err) {
+      return callback(err);
+    }
+    callback(null, rows);
+  });
+};
+
+module.exports = { db, registerUser, verifyUser, updateUserPassword, saveMessage, recordUserSpeech, getRecentMessages, getAllUsers, updateUserAdminStatus, addInvitationCode, getInvitationCode, decrementInvitationCodeUses, muteUser, unmuteUser, isUserMuted, getLeaderboard, getAllInvitationCodes };

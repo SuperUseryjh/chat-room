@@ -35,10 +35,257 @@ const submitChangePasswordButton = document.getElementById('submit-change-passwo
 const changePasswordMessage = document.getElementById('change-password-message');
 
 const logoutButton = document.getElementById('logout-button');
+const onlineUsersList = document.getElementById('online-users-list');
+
+const atSuggestionsContainer = document.getElementById('at-suggestions');
+const atSuggestionsList = document.getElementById('at-suggestions-list');
+let atMentioning = false; // 标记是否正在进行 @ 提及
+let atStartIndex = -1; // @ 符号的起始索引
 
 let currentUsername = '';
 let isAdmin = false;
 let authToken = null; // 存储 JWT
+let quotedMessage = null; // 存储被引用的消息
+
+const replyPreview = document.getElementById('reply-preview');
+const replyUsername = document.getElementById('reply-username');
+const replyContent = document.getElementById('reply-content');
+const clearReplyButton = document.getElementById('clear-reply');
+
+const messageContextMenu = document.getElementById('message-context-menu');
+const contextMenuQuote = document.getElementById('context-menu-quote');
+let currentMessageDataForQuote = null; // 存储当前右键点击的消息数据
+
+// 表情符号短代码映射
+const emojiMap = {
+  ':smile:': '😄',
+  ':laugh:': '😂',
+  ':heart:': '❤️',
+  ':thumbsup:': '👍',
+  ':thinking:': '🤔',
+  ':clap:': '👏',
+  ':fire:': '🔥',
+  ':rocket:': '🚀',
+  ':star:': '⭐',
+  ':tada:': '🎉',
+  ':pray:': '🙏',
+  ':ok_hand:': '👌',
+  ':muscle:': '💪',
+  ':sunglasses:': '😎',
+  ':wink:': '😉',
+  ':cry:': '😢',
+  ':rage:': '😡',
+  ':sweat_smile:': '😅',
+  ':joy:': '😂',
+  ':unamused:': '😒',
+  ':mask:': '😷',
+  ':ghost:': '👻',
+  ':alien:': '👽',
+  ':robot:': '🤖',
+  ':dog:': '🐶',
+  ':cat:': '🐱',
+  ':mouse:': '🐭',
+  ':hamster:': '🐹',
+  ':rabbit:': '🐰',
+  ':fox:': '🦊',
+  ':bear:': '🐻',
+  ':panda_face:': '🐼',
+  ':koala:': '🐨',
+  ':tiger:': '🐯',
+  ':lion:': '🦁',
+  ':cow:': '🐮',
+  ':pig:': '🐷',
+  ':frog:': '🐸',
+  ':octopus:': '🐙',
+  ':monkey:': '🐒',
+  ':chicken:': '🐔',
+  ':penguin:': '🐧',
+  ':bird:': '🐦',
+  ':baby_chick:': '🐥',
+  ':duck:': '🦆',
+  ':eagle:': '🦅',
+  ':owl:': '🦉',
+  ':bat:': '🦇',
+  ':wolf:': '🐺',
+  ':boar:': '🐗',
+  ':horse:': '🐴',
+  ':unicorn:': '🦄',
+  ':bee:': '🐝',
+  ':bug:': '🐛',
+  ':snail:': '🐌',
+  ':beetle:': '🐞',
+  ':ant:': '🐜',
+  ':spider:': '🕷️',
+  ':scorpion:': '🦂',
+  ':crab:': '🦀',
+  ':snake:': '🐍',
+  ':lizard:': '🦎',
+  ':dinosaur:': '🦖',
+  ':sauropod:': '🦕',
+  ':tyrannosaurus_rex:': '🦖',
+  ':fish:': '🐟',
+  ':tropical_fish:': '🐠',
+  ':blowfish:': '🐡',
+  ':shark:': '🦈',
+  ':dolphin:': '🐬',
+  ':whale:': '🐳',
+  ':octopus:': '🐙',
+  ':shell:': '🐚',
+  ':spiral_shell:': '🐚',
+  ':bouquet:': '💐',
+  ':cherry_blossom:': '🌸',
+  ':white_flower:': '💮',
+  ':rosette:': '🏵️',
+  ':rose:': '🌹',
+  ':hibiscus:': '🌺',
+  ':sunflower:': '🌻',
+  ':blossom:': '🌼',
+  ':tulip:': '🌷',
+  ':seedling:': '🌱',
+  ':evergreen_tree:': '🌲',
+  ':deciduous_tree:': '🌳',
+  ':palm_tree:': '🌴',
+  ':cactus:': '🌵',
+  ':ear_of_rice:': '🌾',
+  ':herb:': '🌿',
+  ':shamrock:': '☘️',
+  ':four_leaf_clover:': '🍀',
+  ':maple_leaf:': '🍁',
+  ':fallen_leaf:': '🍂',
+  ':leaves:': '🍃',
+  ':grapes:': '🍇',
+  ':melon:': '🍈',
+  ':watermelon:': '🍉',
+  ':tangerine:': '🍊',
+  ':lemon:': '🍋',
+  ':banana:': '🍌',
+  ':pineapple:': '🍍',
+  ':mango:': '🥭',
+  ':apple:': '🍎',
+  ':green_apple:': '🍏',
+  ':pear:': '🍐',
+  ':peach:': '🍑',
+  ':cherries:': '🍒',
+  ':strawberry:': '🍓',
+  ':kiwi_fruit:': '🥝',
+  ':tomato:': '🍅',
+  ':coconut:': '🥥',
+  ':avocado:': '🥑',
+  ':eggplant:': '🍆',
+  ':potato:': '🥔',
+  ':carrot:': '🥕',
+  ':corn:': '🌽',
+  ':hot_pepper:': '🌶️',
+  ':cucumber:': '🥒',
+  ':broccoli:': '🥦',
+  ':garlic:': '🧄',
+  ':onion:': '🧅',
+  ':mushroom:': '🍄',
+  ':peanuts:': '🥜',
+  ':chestnut:': '🌰',
+  ':bread:': '🍞',
+  ':croissant:': '🥐',
+  ':baguette_bread:': '🥖',
+  ':pretzel:': '🥨',
+  ':bagel:': '🥯',
+  ':pancakes:': '🥞',
+  ':waffle:': '🧇',
+  ':cheese_wedge:': '🧀',
+  ':meat_on_bone:': '🍖',
+  ':poultry_leg:': '🍗',
+  ':cut_of_meat:': '🥩',
+  ':bacon:': '🥓',
+  ':hamburger:': '🍔',
+  ':fries:': '🍟',
+  ':pizza:': '🍕',
+  ':hotdog:': '🌭',
+  ':sandwich:': '🥪',
+  ':taco:': '🌮',
+  ':burrito:': '🌯',
+  ':tamale:': '🫔',
+  ':stuffed_flatbread:': '🥙',
+  ':falafel:': '🧆',
+  ':egg:': '🥚',
+  ':fried_egg:': '🍳',
+  ':shallow_pan_of_food:': '🥘',
+  ':pot_of_food:': '🍲',
+  ':fondue:': '🫕',
+  ':bowl_with_spoon:': '🥣',
+  ':green_salad:': '🥗',
+  ':popcorn:': '🍿',
+  ':butter:': '🧈',
+  ':salt:': '🧂',
+  ':canned_food:': '🥫',
+  ':bento:': '🍱',
+  ':rice_cracker:': '🍘',
+  ':rice_ball:': '🍙',
+  ':cooked_rice:': '🍚',
+  ':curry:': '🍛',
+  ':ramen:': '🍜',
+  ':spaghetti:': '🍝',
+  ':sweet_potato:': '🍠',
+  ':oden:': '🍢',
+  ':sushi:': '🍣',
+  ':fried_shrimp:': '🍤',
+  ':fish_cake:': '🍥',
+  ':moon_cake:': '🥮',
+  ':dango:': '🍡',
+  ':dumpling:': '🥟',
+  ':fortune_cookie:': '🥠',
+  ':takeout_box:': '🥡',
+  ':crab:': '🦀',
+  ':lobster:': '🦞',
+  ':shrimp:': '🦐',
+  ':squid:': '🦑',
+  ':oyster:': '🦪',
+  ':ice_cream:': '🍦',
+  ':shaved_ice:': '🍧',
+  ':ice_cream:': '🍨',
+  ':doughnut:': '🍩',
+  ':cookie:': '🍪',
+  ':birthday_cake:': '🎂',
+  ':cake:': '🍰',
+  ':cupcake:': '🧁',
+  ':pie:': '🥧',
+  ':chocolate_bar:': '🍫',
+  ':candy:': '🍬',
+  ':lollipop:': '🍭',
+  ':custard:': '🍮',
+  ':honey_pot:': '🍯',
+  ':baby_bottle:': '🍼',
+  ':milk_glass:': '🥛',
+  ':coffee:': '☕',
+  ':tea:': '🍵',
+  ':sake:': '🍶',
+  ':champagne:': '🍾',
+  ':wine_glass:': '🍷',
+  ':cocktail:': '🍸',
+  ':tropical_drink:': '🍹',
+  ':beer:': '🍺',
+  ':beers:': '🍻',
+  ':clinking_glasses:': '🥂',
+  ':tumbler_glass:': '🥃',
+  ':cup_with_straw:': '🥤',
+  ':bubble_tea:': '🧋',
+  ':beverage_box:': '🧃',
+  ':mate:': '🧉',
+  ':ice:': '🧊',
+  ':chopsticks:': '🥢',
+  ':fork_and_knife:': '🍴',
+  ':spoon:': '🥄',
+  ':hocho:': '🔪',
+  ':amphora:': '🏺',
+};
+
+function replaceEmojiShortcodes(text) {
+  let newText = text;
+  for (const shortcode in emojiMap) {
+    // Escape special characters in the shortcode for use in RegExp
+    const regex = new RegExp(shortcode.replace(/[-\/\\^$*+?.()|[\\]{}]/g, '\$&'), 'g');
+    newText = newText.replace(regex, emojiMap[shortcode]);
+  }
+  return newText;
+}
 
 // 辅助函数：格式化时间戳
 function formatTimestamp(timestamp) {
@@ -57,19 +304,128 @@ function addMessageToChat(data, isSystem = false) {
         if (data.username === currentUsername) {
             item.classList.add('my-message');
         }
+        let quotedHtml = '';
+        if (data.quoted_message) {
+            quotedHtml = `
+                <div class="quoted-message">
+                    <div class="quoted-meta">引用 ${data.quoted_message.username}:</div>
+                    <div class="quoted-content">${data.quoted_message.message}</div>
+                </div>
+            `;
+        }
         item.innerHTML = `
             <div class="message-meta">${data.username} ${formatTimestamp(data.timestamp)}</div>
-            <div class="message-content">${data.message || ''}
+            ${quotedHtml}
+            <div class="message-content">${formatMessageContent(data.message || '', data.mentions)}
                 ${data.file_url ? `<img src="${data.file_url}" alt="Image" />` : ''}
             </div>
         `;
     }
     messages.appendChild(item);
     messages.scrollTop = messages.scrollHeight;
+
+    // 为消息项添加右键菜单事件监听器
+    if (!isSystem) {
+        item.addEventListener('contextmenu', (event) => {
+            event.preventDefault(); // 阻止默认的右键菜单
+            currentMessageDataForQuote = {
+                username: data.username,
+                message: data.message
+            };
+            messageContextMenu.style.display = 'block';
+            messageContextMenu.style.left = `${event.clientX}px`;
+            messageContextMenu.style.top = `${event.clientY}px`;
+        });
+    }
 }
+
+// 格式化消息内容，高亮 @ 提及
+function formatMessageContent(message, mentions) {
+    if (!mentions || mentions.length === 0) {
+        return message;
+    }
+    let formattedMessage = message;
+    mentions.forEach(mention => {
+        const regex = new RegExp(`@${mention}`, 'g');
+        formattedMessage = formattedMessage.replace(regex, `<span class="at-mention">@${mention}</span>`);
+    });
+    return formattedMessage;
+}
+
+// 清除引用
+clearReplyButton.addEventListener('click', () => {
+    quotedMessage = null;
+    replyPreview.style.display = 'none';
+    replyUsername.textContent = '';
+    replyContent.textContent = '';
+});
+
+// 右键菜单的引用功能
+contextMenuQuote.addEventListener('click', () => {
+    if (currentMessageDataForQuote) {
+        quotedMessage = currentMessageDataForQuote;
+        replyUsername.textContent = quotedMessage.username;
+        replyContent.textContent = quotedMessage.message;
+        replyPreview.style.display = 'block';
+    }
+    messageContextMenu.style.display = 'none';
+});
+
+// 点击其他地方隐藏右键菜单
+document.addEventListener('click', () => {
+    messageContextMenu.style.display = 'none';
+});
 
 // 页面加载时检查登录状态
 document.addEventListener('DOMContentLoaded', () => {
+    // 主题切换逻辑
+    const themeToggleButton = document.getElementById('theme-toggle-button');
+    let currentTheme = localStorage.getItem('theme') || 'system'; // 默认跟随系统
+
+    function applyTheme(theme) {
+        const body = document.body;
+        if (theme === 'system') {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            body.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+        } else {
+            body.setAttribute('data-theme', theme);
+        }
+        localStorage.setItem('theme', theme);
+        updateThemeButtonText(theme);
+    }
+
+    function updateThemeButtonText(theme) {
+        if (theme === 'light') {
+            themeToggleButton.textContent = '当前: 明亮';
+        } else if (theme === 'dark') {
+            themeToggleButton.textContent = '当前: 黑暗';
+        } else {
+            themeToggleButton.textContent = '当前: 跟随系统';
+        }
+    }
+
+    // 初始化主题
+    applyTheme(currentTheme);
+
+    // 监听系统主题变化
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (localStorage.getItem('theme') === 'system') {
+            applyTheme('system');
+        }
+    });
+
+    // 切换主题按钮点击事件
+    themeToggleButton.addEventListener('click', () => {
+        if (currentTheme === 'system') {
+            currentTheme = 'light';
+        } else if (currentTheme === 'light') {
+            currentTheme = 'dark';
+        } else {
+            currentTheme = 'system';
+        }
+        applyTheme(currentTheme);
+    });
+
     authToken = localStorage.getItem('chat_token');
     currentUsername = localStorage.getItem('chat_username');
     isAdmin = localStorage.getItem('chat_isAdmin') === 'true';
@@ -204,6 +560,9 @@ form.addEventListener('submit', async (e) => {
         return; // 没有消息也没有图片，不发送
     }
 
+    // 处理消息文本中的表情符号短代码
+    const processedMessageText = replaceEmojiShortcodes(messageText);
+
     if (imageFile) {
         const formData = new FormData();
         formData.append('image', imageFile);
@@ -216,7 +575,7 @@ form.addEventListener('submit', async (e) => {
             const data = await response.json();
 
             if (data.success) {
-                socket.emit('chat message', { token: authToken, text: messageText, fileUrl: data.fileUrl }, (res) => {
+                socket.emit('chat message', { token: authToken, text: processedMessageText, fileUrl: data.fileUrl, quotedMessage: quotedMessage }, (res) => {
                     if (!res.success) {
                         alert(res.message);
                         if (res.message.includes('token') || res.message.includes('登录会话')) {
@@ -230,6 +589,8 @@ form.addEventListener('submit', async (e) => {
                 });
                 input.value = '';
                 imageInput.value = ''; // 清空文件选择
+                quotedMessage = null; // 清除引用状态
+                replyPreview.style.display = 'none';
             } else {
                 alert('图片上传失败: ' + data.message);
             }
@@ -237,8 +598,8 @@ form.addEventListener('submit', async (e) => {
             console.error('图片上传请求失败:', error);
             alert('图片上传失败');
         }
-    } else if (messageText) {
-        socket.emit('chat message', { token: authToken, text: messageText }, (res) => {
+    } else if (processedMessageText) { // 使用处理后的消息文本
+        socket.emit('chat message', { token: authToken, text: processedMessageText, quotedMessage: quotedMessage }, (res) => {
             if (!res.success) {
                 alert(res.message);
                 if (res.message.includes('token') || res.message.includes('登录会话')) {
@@ -251,6 +612,8 @@ form.addEventListener('submit', async (e) => {
             }
         });
         input.value = '';
+        quotedMessage = null; // 清除引用状态
+        replyPreview.style.display = 'none';
     }
 });
 
@@ -274,6 +637,16 @@ socket.on('user joined', (username) => {
 // 用户离开通知
 socket.on('user left', (username) => {
     addMessageToChat({ message: `${username} 离开了聊天室`, timestamp: new Date().toISOString() }, true);
+});
+
+// 接收在线用户列表
+socket.on('online users', (users) => {
+    onlineUsersList.innerHTML = ''; // 清空现有列表
+    users.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user;
+        onlineUsersList.appendChild(li);
+    });
 });
 
 // 接收聊天错误信息 (例如被禁言)
